@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OncoClear — Sign In</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #020b18;
+      --surface: #061424;
+      --panel: #0a1f35;
+      --accent: #00d4ff;
+      --accent2: #7b2fff;
+      --accent3: #ff4d6d;
+      --text: #e8f4fd;
+      --muted: #5a7a9a;
+      --border: rgba(0,212,255,0.12);
+      --glow: rgba(0,212,255,0.25);
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    /* ── Canvas Background ── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      opacity: 0.6;
+    }
+
+    /* ── Split Layout ── */
+    .layout {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: 100vh;
+    }
+
+    /* ── LEFT PANEL ── */
+    .info-panel {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 60px 56px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .info-panel::before {
+      content: '';
+      position: absolute;
+      right: 0; top: 0; bottom: 0;
+      width: 1px;
+      background: linear-gradient(to bottom, transparent, var(--accent), transparent);
+      opacity: 0.4;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 2rem;
+      letter-spacing: -0.03em;
+      margin-bottom: 64px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .tagline {
+      font-family: 'Syne', sans-serif;
+      font-size: 2.8rem;
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.04em;
+      margin-bottom: 24px;
+    }
+
+    .tagline span {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .tagline-sub {
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.7;
+      max-width: 380px;
+      margin-bottom: 48px;
+    }
+
+    /* Stats */
+    .stats {
+      display: flex;
+      gap: 32px;
+    }
+
+    .stat {
+      border-left: 2px solid var(--accent);
+      padding-left: 16px;
+      opacity: 0;
+      animation: fadeUp 0.6s ease forwards;
+    }
+
+    .stat:nth-child(2) { animation-delay: 0.15s; border-color: var(--accent2); }
+    .stat:nth-child(3) { animation-delay: 0.3s; border-color: var(--accent3); }
+
+    .stat-num {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.8rem;
+      font-weight: 800;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    /* Cancer ribbon floating */
+    .ribbon-float {
+      position: absolute;
+      bottom: 48px;
+      right: -20px;
+      opacity: 0.08;
+      font-size: 180px;
+      animation: slowFloat 8s ease-in-out infinite;
+      pointer-events: none;
+    }
+
+    @keyframes slowFloat {
+      0%, 100% { transform: translateY(0) rotate(-5deg); }
+      50% { transform: translateY(-20px) rotate(5deg); }
+    }
+
+    /* ── RIGHT PANEL (Auth Form) ── */
+    .auth-panel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+    }
+
+    .auth-card {
+      width: 100%;
+      max-width: 420px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 40px;
+      box-shadow: 0 0 60px rgba(0,212,255,0.07);
+      backdrop-filter: blur(10px);
+      animation: slideIn 0.7s cubic-bezier(0.16,1,0.3,1) forwards;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(30px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Tabs */
+    .tab-row {
+      display: flex;
+      background: var(--surface);
+      border-radius: 10px;
+      padding: 4px;
+      margin-bottom: 32px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: 8px;
+      transition: all 0.25s;
+    }
+
+    .tab-btn.active {
+      background: var(--accent);
+      color: var(--bg);
+      font-weight: 600;
+    }
+
+    /* Form heading */
+    .form-heading {
+      font-family: 'Syne', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .form-sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 28px;
+    }
+
+    /* Fields */
+    .field {
+      margin-bottom: 18px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .field input, .field select {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.95rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+
+    .field input:focus, .field select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0,212,255,0.1);
+    }
+
+    .field input::placeholder { color: #304a60; }
+
+    .field select option { background: var(--surface); }
+
+    /* Password strength */
+    .strength-bar {
+      margin-top: 6px;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      display: none;
+    }
+
+    .strength-fill {
+      height: 100%;
+      width: 0;
+      border-radius: 2px;
+      transition: width 0.3s, background 0.3s;
+    }
+
+    /* Submit button */
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-family: 'Syne', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.15s, box-shadow 0.2s;
+    }
+
+    .btn-submit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 30px rgba(0,212,255,0.3);
+    }
+
+    .btn-submit:active { transform: translateY(0); }
+
+    .btn-submit .btn-text { position: relative; z-index: 1; }
+
+    .btn-submit::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .btn-submit:hover::after { opacity: 1; }
+
+    /* Loader inside button */
+    .btn-loader {
+      display: none;
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .alert {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      margin-top: 14px;
+      display: none;
+    }
+
+    .alert-error { background: rgba(255,77,109,0.12); border: 1px solid rgba(255,77,109,0.3); color: #ff4d6d; }
+    .alert-success { background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.3); color: var(--accent); }
+
+    /* Form switch animation */
+    .form-view { display: none; }
+    .form-view.active { display: block; animation: formFade 0.3s ease; }
+
+    @keyframes formFade {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── DNA particles overlay ── */
+    .dna-float {
+      position: fixed;
+      pointer-events: none;
+      z-index: 0;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+    }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .info-panel { display: none; }
+      .auth-panel { padding: 24px 16px; }
+      html, body { overflow: auto; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+
+<div class="layout">
+
+  <!-- LEFT: Info -->
+  <div class="info-panel">
+    <div class="logo">
+      <div class="logo-icon">🧬</div>
+      OncoClear
+    </div>
+
+    <h1 class="tagline">
+      Early Detection.<br />
+      <span>Better Outcomes.</span>
+    </h1>
+
+    <p class="tagline-sub">
+      Upload your prescription and let our AI analyze potential cancer markers — precise, private, and instant.
+    </p>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-num">94.7%</div>
+        <div class="stat-label">Accuracy Rate</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">12K+</div>
+        <div class="stat-label">Scans Analyzed</div>
+      </div>
+      <div class="stat">
+        <div class="stat-num">&lt;60s</div>
+        <div class="stat-label">Avg. Result Time</div>
+      </div>
+    </div>
+
+    <div class="ribbon-float">🎗️</div>
+  </div>
+
+  <!-- RIGHT: Auth Card -->
+  <div class="auth-panel">
+    <div class="auth-card">
+
+      <div class="tab-row">
+        <button class="tab-btn active" onclick="switchTab('login')">Sign In</button>
+        <button class="tab-btn" onclick="switchTab('register')">Create Account</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div class="form-view active" id="form-login">
+        <div class="form-heading">Welcome back</div>
+        <div class="form-sub">Sign in to your OncoClear account</div>
+
+        <div class="field">
+          <label>Email Address</label>
+          <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" />
+        </div>
+
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+
+        <button class="btn-submit" onclick="handleLogin()">
+          <span class="btn-text">Sign In →</span>
+          <div class="btn-loader" id="login-loader"></div>
+        </button>
+        <div class="alert alert-error" id="login-error"></div>
+        <div class="alert alert-success" id="login-success"></div>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div class="form-view" id="form-register">
+        <div class="form-heading">Create account</div>
+        <div class="form-sub">Start your health analysis journey</div>
+
+        <div class="field">
+          <label>Full Name</label>
+          <input type="text" id="reg-name" placeholder="Dr. Arjun Sharma" />
+        </div>
+
+        <div class="field">
+          <label>Email Address</label>
+          <input type="email" id="reg-email" placeholder="you@example.com" />
+        </div>
+
+        <div class="field">
+          <label>Role</label>
+          <select id="reg-role">
+            <option value="patient">Patient</option>
+            <option value="doctor">Doctor / Clinician</option>
+            <option value="researcher">Researcher</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="reg-password" placeholder="Min. 6 characters" oninput="checkStrength(this.value)" />
+          <div class="strength-bar" id="strength-bar">
+            <div class="strength-fill" id="strength-fill"></div>
+          </div>
+        </div>
+
+        <button class="btn-submit" onclick="handleRegister()">
+          <span class="btn-text">Create Account →</span>
+          <div class="btn-loader" id="reg-loader"></div>
+        </button>
+        <div class="alert alert-error" id="reg-error"></div>
+        <div class="alert alert-success" id="reg-success"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Config ──
+  // Uses same origin as the page → works when served by the Express backend.
+  // If you open auth.html as a raw file (file://) change this to 'http://localhost:5000/api'
+  const API_BASE = window.location.protocol === 'file:'
+    ? 'http://localhost:5000/api'
+    : '/api';
+
+  // ── Tab Switch ──
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+      b.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'register'));
+    });
+    document.getElementById('form-login').classList.toggle('active', tab === 'login');
+    document.getElementById('form-register').classList.toggle('active', tab === 'register');
+    clearAlerts();
+  }
+
+  function clearAlerts() {
+    document.querySelectorAll('.alert').forEach(a => { a.style.display = 'none'; a.textContent = ''; });
+  }
+
+  function showAlert(id, msg, type = 'error') {
+    const el = document.getElementById(id);
+    el.textContent = msg;
+    el.className = `alert alert-${type}`;
+    el.style.display = 'block';
+  }
+
+  function setLoading(btnSelector, loaderId, loading) {
+    const btn = document.querySelector(btnSelector);
+    const loader = document.getElementById(loaderId);
+    const text = btn.querySelector('.btn-text');
+    btn.disabled = loading;
+    text.style.display = loading ? 'none' : 'block';
+    loader.style.display = loading ? 'block' : 'none';
+  }
+
+  // ── LOGIN ──
+  async function handleLogin() {
+    clearAlerts();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!email || !password) return showAlert('login-error', 'Please fill in all fields');
+
+    setLoading('#form-login .btn-submit', 'login-loader', true);
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        showAlert('login-success', `Welcome back, ${data.user.name}! Redirecting...`, 'success');
+        setTimeout(() => window.location.href = '/dashboard.html', 1200);
+      } else {
+        showAlert('login-error', data.message || 'Login failed');
+      }
+    } catch (err) {
+      showAlert('login-error', 'Cannot connect to server. Is the backend running?');
+    }
+
+    setLoading('#form-login .btn-submit', 'login-loader', false);
+  }
+
+  // ── REGISTER ──
+  async function handleRegister() {
+    clearAlerts();
+    const name = document.getElementById('reg-name').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const role = document.getElementById('reg-role').value;
+
+    if (!name || !email || !password) return showAlert('reg-error', 'Please fill in all fields');
+    if (password.length < 6) return showAlert('reg-error', 'Password must be at least 6 characters');
+
+    setLoading('#form-register .btn-submit', 'reg-loader', true);
+
+    try {
+      const res = await fetch(`${API_BASE}/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password, role })
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        showAlert('reg-success', 'Account created! Redirecting to dashboard...', 'success');
+        setTimeout(() => window.location.href = '/dashboard.html', 1200);
+      } else {
+        showAlert('reg-error', data.message || 'Registration failed');
+      }
+    } catch (err) {
+      showAlert('reg-error', 'Cannot connect to server. Is the backend running?');
+    }
+
+    setLoading('#form-register .btn-submit', 'reg-loader', false);
+  }
+
+  // ── Password Strength ──
+  function checkStrength(val) {
+    const bar = document.getElementById('strength-bar');
+    const fill = document.getElementById('strength-fill');
+    bar.style.display = 'block';
+    let score = 0;
+    if (val.length >= 6) score++;
+    if (val.length >= 10) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const colors = ['#ff4d6d','#ff8c42','#ffd166','#06d6a0','#00d4ff'];
+    const widths = ['20%','40%','60%','80%','100%'];
+    fill.style.width = widths[score - 1] || '0%';
+    fill.style.background = colors[score - 1] || 'transparent';
+  }
+
+  // ── Background Canvas ──
+  const canvas = document.getElementById('bg-canvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width = window.innerWidth;
+    H = canvas.height = window.innerHeight;
+  }
+
+  function initParticles() {
+    particles = [];
+    for (let i = 0; i < 80; i++) {
+      particles.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        r: Math.random() * 2 + 0.5,
+        dx: (Math.random() - 0.5) * 0.4,
+        dy: (Math.random() - 0.5) * 0.4,
+        alpha: Math.random() * 0.5 + 0.1,
+        color: Math.random() > 0.5 ? '0,212,255' : '123,47,255'
+      });
+    }
+  }
+
+  function drawParticles() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw connections
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 120) {
+          ctx.beginPath();
+          ctx.strokeStyle = `rgba(0,212,255,${(1 - dist / 120) * 0.07})`;
+          ctx.lineWidth = 0.5;
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Draw particles
+    particles.forEach(p => {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${p.color},${p.alpha})`;
+      ctx.fill();
+      p.x += p.dx; p.y += p.dy;
+      if (p.x < 0 || p.x > W) p.dx *= -1;
+      if (p.y < 0 || p.y > H) p.dy *= -1;
+    });
+
+    requestAnimationFrame(drawParticles);
+  }
+
+  window.addEventListener('resize', () => { resize(); initParticles(); });
+  resize(); initParticles(); drawParticles();
+
+  // ── Enter key support ──
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      if (document.getElementById('form-login').classList.contains('active')) handleLogin();
+      else handleRegister();
+    }
+  });
+
+  // ── Auto-redirect if already logged in ──
+  if (localStorage.getItem('token')) window.location.href = '/dashboard.html';
+</script>
+</body>
+</html>
