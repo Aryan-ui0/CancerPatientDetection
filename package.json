@@ -1,0 +1,31 @@
+{
+  "name": "codingextra",
+  "version": "1.0.0",
+  "description": "This error means one of three things: 1. The backend is not running → **start it** (see below) 2. MongoDB is not running → **start it** (see below)   3. You opened `auth.html` directly as a file → **use http://localhost:5000/auth.html instead**",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Aryan-ui0/CancerPatientDetection.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Aryan-ui0/CancerPatientDetection/issues"
+  },
+  "homepage": "https://github.com/Aryan-ui0/CancerPatientDetection#readme",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.3.1",
+    "multer": "^2.1.1"
+  }
+}

@@ -484,13 +484,41 @@
   </div>
 </div>
 
+<!-- Firebase (Firestore) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <script>
-  // ── Config ──
-  // Uses same origin as the page → works when served by the Express backend.
-  // If you open auth.html as a raw file (file://) change this to 'http://localhost:5000/api'
-  const API_BASE = window.location.protocol === 'file:'
-    ? 'http://localhost:5000/api'
-    : '/api';
+  // ── Firebase (Firestore) ──
+  // Create a Web app in Firebase Console and paste the config below.
+  // Notes:
+  // - Do NOT store passwords in Firebase from the client.
+  // - This page writes a public profile document only.
+  const firebaseConfig = {
+    apiKey: "AIzaSyASRI0Aspvv9tiapNgdpVZAZlFukd6ix08",
+  authDomain: "onco-db.firebaseapp.com",
+  projectId: "onco-db",
+  storageBucket: "onco-db.firebasestorage.app",
+  messagingSenderId: "1057477186413",
+  appId: "1:1057477186413:web:b96ea493ed7df25ba34064",
+  measurementId: "G-B2QLZCT20H"
+  };
+
+  // Initialize (safe if reloaded)
+  if (!window.firebase) {
+    console.error('Firebase SDK not loaded. Check script tags.');
+  }
+  if (window.firebase && !window.firebase.apps?.length) {
+    window.firebase.initializeApp(firebaseConfig);
+  } else if (window.firebase && window.firebase.apps?.length) {
+    // In case you're hot-reloading or navigating between pages.
+    // Keep existing app instance.
+  }
+
+  const firestore = window.firebase ? window.firebase.firestore() : null;
+  const auth = window.firebase ? window.firebase.auth() : null;
+  const FIRESTORE_USERS_COLLECTION = 'users';
 
   // ── Tab Switch ──
   function switchTab(tab) {
@@ -533,23 +561,25 @@
     setLoading('#form-login .btn-submit', 'login-loader', true);
 
     try {
-      const res = await fetch(`${API_BASE}/auth/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
+      const cred = await auth.signInWithEmailAndPassword(email, password);
+      const uid = cred.user.uid;
 
-      if (data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        showAlert('login-success', `Welcome back, ${data.user.name}! Redirecting...`, 'success');
-        setTimeout(() => window.location.href = '/dashboard.html', 1200);
-      } else {
-        showAlert('login-error', data.message || 'Login failed');
+      // Ensure there is a profile doc (dashboard relies on it for display name/role).
+      const doc = await firestore.collection(FIRESTORE_USERS_COLLECTION).doc(uid).get();
+      if (!doc.exists) {
+        await firestore.collection(FIRESTORE_USERS_COLLECTION).doc(uid).set({
+          name: (cred.user.email || 'User').split('@')[0],
+          email: cred.user.email,
+          role: 'patient',
+          createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
+        }, { merge: true });
       }
+
+      showAlert('login-success', 'Signed in! Redirecting...', 'success');
+      setTimeout(() => window.location.href = '/dashboard.html', 1200);
     } catch (err) {
-      showAlert('login-error', 'Cannot connect to server. Is the backend running?');
+      console.warn('Firebase login error:', err);
+      showAlert('login-error', err?.message || 'Login failed');
     }
 
     setLoading('#form-login .btn-submit', 'login-loader', false);
@@ -569,23 +599,25 @@
     setLoading('#form-register .btn-submit', 'reg-loader', true);
 
     try {
-      const res = await fetch(`${API_BASE}/auth/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role })
-      });
-      const data = await res.json();
+      const cred = await auth.createUserWithEmailAndPassword(email, password);
+      const uid = cred.user.uid;
 
-      if (data.success) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        showAlert('reg-success', 'Account created! Redirecting to dashboard...', 'success');
-        setTimeout(() => window.location.href = '/dashboard.html', 1200);
-      } else {
-        showAlert('reg-error', data.message || 'Registration failed');
-      }
+      await firestore.collection(FIRESTORE_USERS_COLLECTION).doc(String(uid)).set({
+        name,
+        email,
+        role,
+        createdAt: window.firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true });
+
+      showAlert('reg-success', 'Account created! Redirecting...', 'success');
+      setTimeout(() => window.location.href = '/dashboard.html', 1200);
     } catch (err) {
-      showAlert('reg-error', 'Cannot connect to server. Is the backend running?');
+      console.warn('Firebase register error:', err);
+      if (err?.code === 'auth/email-already-in-use') {
+        showAlert('reg-error', 'That email is already registered. Try signing in instead.');
+      } else {
+        showAlert('reg-error', err?.message || 'Registration failed');
+      }
     }
 
     setLoading('#form-register .btn-submit', 'reg-loader', false);
@@ -679,7 +711,7 @@
   });
 
   // ── Auto-redirect if already logged in ──
-  if (localStorage.getItem('token')) window.location.href = '/dashboard.html';
+  if (auth && auth.currentUser) window.location.href = '/dashboard.html';
 </script>
 </body>
 </html>
