@@ -6,46 +6,57 @@ const jwt      = require('jsonwebtoken');
 const multer   = require('multer');
 const path     = require('path');
 const fs       = require('fs');
-const mongoose = require('mongoose');
 
 const app = express();
 const PORT       = process.env.PORT       || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'oncoclear_dev_secret_change_in_prod';
-const MONGO_URI  = process.env.MONGO_URI  || 'mongodb://127.0.0.1:27017/oncoclear';
+const DB_PATH = path.join(__dirname, 'db.json');
+let dbConnected = false;
 
-// ─── Mongoose Models ──────────────────────────────────────────────────────────
-
-const UserSchema = new mongoose.Schema({
-  name:      { type: String, required: true, trim: true },
-  email:     { type: String, required: true, unique: true, lowercase: true, trim: true },
-  password:  { type: String, required: true },
-  role:      { type: String, enum: ['patient', 'doctor', 'researcher'], default: 'patient' },
-  createdAt: { type: Date, default: Date.now }
+const defaultDb = () => ({
+  users: [],
+  prescriptions: [],
+  counters: { user: 0, prescription: 0 }
 });
 
-const PrescriptionSchema = new mongoose.Schema({
-  userId:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  fileName:   { type: String, required: true },
-  storedName: { type: String, required: true },
-  filePath:   { type: String, required: true },
-  fileSize:   { type: Number },
-  mimeType:   { type: String },
-  status:     { type: String, enum: ['pending_analysis','analyzing','completed','failed'], default: 'pending_analysis' },
-  aiResult:   { type: mongoose.Schema.Types.Mixed, default: null },
-  uploadedAt: { type: Date, default: Date.now }
-});
+const ensureDbFile = () => {
+  if (!fs.existsSync(DB_PATH)) {
+    fs.writeFileSync(DB_PATH, JSON.stringify(defaultDb(), null, 2), 'utf8');
+  }
+};
 
-const User         = mongoose.model('User',         UserSchema);
-const Prescription = mongoose.model('Prescription', PrescriptionSchema);
+const readDb = () => {
+  ensureDbFile();
+  const raw = fs.readFileSync(DB_PATH, 'utf8');
+  const parsed = JSON.parse(raw || '{}');
 
-// ─── Connect MongoDB ──────────────────────────────────────────────────────────
-mongoose.connect(MONGO_URI)
-  .then(() => console.log(`✅  MongoDB connected → ${MONGO_URI}`))
-  .catch(err => {
-    console.error('❌  MongoDB connection FAILED:', err.message);
-    console.error('    → Is mongod running?  Try: sudo systemctl start mongod  OR  brew services start mongodb-community');
-    process.exit(1);
-  });
+  return {
+    users: Array.isArray(parsed.users) ? parsed.users : [],
+    prescriptions: Array.isArray(parsed.prescriptions) ? parsed.prescriptions : [],
+    counters: {
+      user: Number(parsed?.counters?.user || 0),
+      prescription: Number(parsed?.counters?.prescription || 0)
+    }
+  };
+};
+
+const writeDb = (db) => {
+  fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), 'utf8');
+};
+
+const connectLocalDb = () => {
+  try {
+    ensureDbFile();
+    readDb();
+    dbConnected = true;
+    console.log(`✅  Local DB connected → ${DB_PATH}`);
+  } catch (err) {
+    dbConnected = false;
+    console.error('❌  Local DB connection FAILED:', err.message);
+  }
+};
+
+connectLocalDb();
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 // Allow all origins during dev — tighten in production
@@ -53,18 +64,22 @@ app.use(cors({ origin: '*', credentials: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// ── Serve frontend folder as static files ────────────────────────────────────
+// ── Serve current project folder as static files ─────────────────────────────
 // This means auth.html & dashboard.html are reachable at:
 //   http://localhost:5000/auth.html
 //   http://localhost:5000/dashboard.html
-// And all fetch() calls go to the same origin → zero CORS problems.
-const frontendPath = path.join(__dirname, '..', 'frontend');
+// And all fetch() calls go to the same origin -> zero CORS problems.
+const frontendPath = __dirname;
 if (fs.existsSync(frontendPath)) {
   app.use(express.static(frontendPath));
   console.log(`🌐  Serving frontend from: ${frontendPath}`);
 } else {
-  console.warn('⚠️   frontend/ folder not found next to backend/ — skipping static serve');
+  console.warn('Static frontend folder not found - skipping static serve');
 }
+
+app.get('/', (req, res) => {
+  res.redirect('/auth.html');
+});
 
 // ─── Upload Directory ─────────────────────────────────────────────────────────
 const uploadDir = path.join(__dirname, 'uploads');
@@ -95,15 +110,26 @@ const auth = (req, res, next) => {
   });
 };
 
+// Return a clear status when DB-dependent APIs are called before DB is ready.
+app.use('/api', (req, res, next) => {
+  if (req.path === '/health') return next();
+  if (!dbConnected) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database is not connected. Check db.json and retry.'
+    });
+  }
+  next();
+});
+
 // ─── API Routes ───────────────────────────────────────────────────────────────
 
 // Health + DB status
 app.get('/api/health', (req, res) => {
-  const dbState = ['disconnected','connected','connecting','disconnecting'];
   res.json({
     success:   true,
     api:       'OncoClear running',
-    database:  dbState[mongoose.connection.readyState] || 'unknown',
+    database:  dbConnected ? 'connected' : 'disconnected',
     timestamp: new Date()
   });
 });
@@ -112,6 +138,7 @@ app.get('/api/health', (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+    const cleanEmail = email?.toLowerCase().trim();
 
     if (!name || !email || !password)
       return res.status(400).json({ success: false, message: 'Name, email and password are required' });
@@ -120,18 +147,32 @@ app.post('/api/auth/register', async (req, res) => {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
       return res.status(400).json({ success: false, message: 'Invalid email format' });
 
-    if (await User.findOne({ email: email.toLowerCase() }))
+    const db = readDb();
+    const existing = db.users.find((u) => u.email === cleanEmail);
+    if (existing)
       return res.status(409).json({ success: false, message: 'Email already registered' });
 
     const hashed = await bcrypt.hash(password, 12);
-    const user   = await new User({ name: name.trim(), email: email.toLowerCase().trim(), password: hashed, role: role || 'patient' }).save();
+    db.counters.user += 1;
+    const user = {
+      id: String(db.counters.user),
+      name: name.trim(),
+      email: cleanEmail,
+      password: hashed,
+      role: role || 'patient',
+      created_at: new Date().toISOString()
+    };
+    db.users.push(user);
+    writeDb(db);
 
-    const token = jwt.sign({ id: user._id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.status(201).json({ success: true, message: 'Account created', token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.status(201).json({ success: true, message: 'Account created', token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 
   } catch (err) {
     console.error('Register:', err.message);
-    if (err.code === 11000) return res.status(409).json({ success: false, message: 'Email already registered' });
+    if (String(err.message).toLowerCase().includes('duplicate') || String(err.message).toLowerCase().includes('unique')) {
+      return res.status(409).json({ success: false, message: 'Email already registered' });
+    }
     res.status(500).json({ success: false, message: 'Server error during registration' });
   }
 });
@@ -143,12 +184,13 @@ app.post('/api/auth/login', async (req, res) => {
     if (!email || !password)
       return res.status(400).json({ success: false, message: 'Email and password required' });
 
-    const user = await User.findOne({ email: email.toLowerCase() });
+    const db = readDb();
+    const user = db.users.find((u) => u.email === email.toLowerCase().trim());
     if (!user || !(await bcrypt.compare(password, user.password)))
       return res.status(401).json({ success: false, message: 'Invalid email or password' });
 
-    const token = jwt.sign({ id: user._id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-    res.json({ success: true, message: 'Login successful', token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+    const token = jwt.sign({ id: user.id, email: user.email, name: user.name, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    res.json({ success: true, message: 'Login successful', token, user: { id: user.id, name: user.name, email: user.email, role: user.role } });
 
   } catch (err) {
     console.error('Login:', err.message);
@@ -159,9 +201,19 @@ app.post('/api/auth/login', async (req, res) => {
 // ── PROFILE ───────────────────────────────────────────────────────────────────
 app.get('/api/auth/profile', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user.id).select('-password');
+    const db = readDb();
+    const user = db.users.find((u) => u.id === String(req.user.id));
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
-    res.json({ success: true, user });
+    res.json({
+      success: true,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        created_at: user.created_at
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -172,11 +224,22 @@ app.post('/api/prescription/upload', auth, upload.single('prescription'), async 
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
 
-    const rx = await new Prescription({
-      userId: req.user.id, fileName: req.file.originalname,
-      storedName: req.file.filename, filePath: req.file.path,
-      fileSize: req.file.size, mimeType: req.file.mimetype
-    }).save();
+    const db = readDb();
+    db.counters.prescription += 1;
+    const rx = {
+      id: String(db.counters.prescription),
+      user_id: String(req.user.id),
+      file_name: req.file.originalname,
+      stored_name: req.file.filename,
+      file_path: req.file.path,
+      file_size: req.file.size,
+      mime_type: req.file.mimetype,
+      status: 'pending_analysis',
+      ai_result: null,
+      uploaded_at: new Date().toISOString()
+    };
+    db.prescriptions.push(rx);
+    writeDb(db);
 
     // ── Plug AI model here ────────────────────────────────────────────────
     // const result = await yourModel.analyze(req.file.path);
@@ -186,8 +249,8 @@ app.post('/api/prescription/upload', auth, upload.single('prescription'), async 
     res.status(201).json({
       success: true,
       message: 'Prescription saved to database',
-      prescription: { id: rx._id, fileName: rx.fileName, status: rx.status, uploadedAt: rx.uploadedAt },
-      analysis: { analyzed: false, message: 'AI model not connected yet — file stored in DB.' }
+      prescription: { id: rx.id, fileName: rx.file_name, status: rx.status, uploadedAt: rx.uploaded_at },
+      analysis: { analyzed: false, message: 'AI model not connected yet - file stored in db.json.' }
     });
   } catch (err) {
     console.error('Upload:', err.message);
@@ -199,8 +262,23 @@ app.post('/api/prescription/upload', auth, upload.single('prescription'), async 
 // ── PRESCRIPTION HISTORY ──────────────────────────────────────────────────────
 app.get('/api/prescription/history', auth, async (req, res) => {
   try {
-    const list = await Prescription.find({ userId: req.user.id }).sort({ uploadedAt: -1 }).select('-filePath -storedName');
-    res.json({ success: true, count: list.length, prescriptions: list });
+    const db = readDb();
+    const list = db.prescriptions
+      .filter((p) => p.user_id === String(req.user.id))
+      .sort((a, b) => new Date(b.uploaded_at) - new Date(a.uploaded_at));
+
+    const prescriptions = list.map((p) => ({
+      _id: p.id,
+      userId: p.user_id,
+      fileName: p.file_name,
+      fileSize: p.file_size,
+      mimeType: p.mime_type,
+      status: p.status,
+      aiResult: p.ai_result,
+      uploadedAt: p.uploaded_at
+    }));
+
+    res.json({ success: true, count: prescriptions.length, prescriptions });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -209,9 +287,25 @@ app.get('/api/prescription/history', auth, async (req, res) => {
 // ── SINGLE PRESCRIPTION ───────────────────────────────────────────────────────
 app.get('/api/prescription/:id', auth, async (req, res) => {
   try {
-    const rx = await Prescription.findOne({ _id: req.params.id, userId: req.user.id });
+    const db = readDb();
+    const rx = db.prescriptions.find((p) => p.id === String(req.params.id) && p.user_id === String(req.user.id));
     if (!rx) return res.status(404).json({ success: false, message: 'Not found' });
-    res.json({ success: true, prescription: rx });
+
+    res.json({
+      success: true,
+      prescription: {
+        _id: rx.id,
+        userId: rx.user_id,
+        fileName: rx.file_name,
+        storedName: rx.stored_name,
+        filePath: rx.file_path,
+        fileSize: rx.file_size,
+        mimeType: rx.mime_type,
+        status: rx.status,
+        aiResult: rx.ai_result,
+        uploadedAt: rx.uploaded_at
+      }
+    });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -220,10 +314,15 @@ app.get('/api/prescription/:id', auth, async (req, res) => {
 // ── DELETE PRESCRIPTION ───────────────────────────────────────────────────────
 app.delete('/api/prescription/:id', auth, async (req, res) => {
   try {
-    const rx = await Prescription.findOne({ _id: req.params.id, userId: req.user.id });
+    const db = readDb();
+    const rxIndex = db.prescriptions.findIndex((p) => p.id === String(req.params.id) && p.user_id === String(req.user.id));
+    const rx = rxIndex >= 0 ? db.prescriptions[rxIndex] : null;
     if (!rx) return res.status(404).json({ success: false, message: 'Not found' });
-    if (fs.existsSync(rx.filePath)) fs.unlinkSync(rx.filePath);
-    await rx.deleteOne();
+
+    if (fs.existsSync(rx.file_path)) fs.unlinkSync(rx.file_path);
+
+    db.prescriptions.splice(rxIndex, 1);
+    writeDb(db);
     res.json({ success: true, message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -234,8 +333,17 @@ app.delete('/api/prescription/:id', auth, async (req, res) => {
 app.get('/api/admin/users', auth, async (req, res) => {
   if (!['doctor','researcher'].includes(req.user.role))
     return res.status(403).json({ success: false, message: 'Access denied' });
-  const users = await User.find().select('-password').sort({ createdAt: -1 });
-  res.json({ success: true, count: users.length, users });
+  try {
+    const db = readDb();
+    const users = db.users
+      .map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role, created_at: u.created_at }))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    res.json({ success: true, count: users.length, users });
+  } catch (err) {
+    console.error('Admin users:', err.message);
+    return res.status(500).json({ success: false, message: 'Server error' });
+  }
 });
 
 // ─── Global Error Handler ─────────────────────────────────────────────────────
