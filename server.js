@@ -1,15 +1,4 @@
 require('dotenv').config();
-<<<<<<< HEAD
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
-
-const app = express();
-const PORT = process.env.PORT || 5000;
-
-// Serve static HTML directly (Firebase handles auth + data).
-const frontendPath = path.join(__dirname, 'frontend');
-=======
 const express  = require('express');
 const cors     = require('cors');
 const bcrypt   = require('bcryptjs');
@@ -81,19 +70,10 @@ app.use(express.urlencoded({ extended: true }));
 //   http://localhost:5000/dashboard.html
 // And all fetch() calls go to the same origin -> zero CORS problems.
 const frontendPath = __dirname;
->>>>>>> 575d88153cf73822eecd80f25b2c07b2b4799a74
 if (fs.existsSync(frontendPath)) {
   app.use(express.static(frontendPath));
   console.log(`🌐 Serving frontend from: ${frontendPath}`);
 } else {
-<<<<<<< HEAD
-  app.use(express.static(__dirname));
-  console.log(`🌐 Serving project root from: ${__dirname}`);
-}
-
-app.get('/', (req, res) => res.redirect('/auth.html'));
-
-=======
   console.warn('Static frontend folder not found - skipping static serve');
 }
 
@@ -373,7 +353,6 @@ app.use((err, req, res, next) => {
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
->>>>>>> 575d88153cf73822eecd80f25b2c07b2b4799a74
 app.listen(PORT, () => {
   console.log(`🧬 OncoClear running at http://localhost:${PORT}`);
 });

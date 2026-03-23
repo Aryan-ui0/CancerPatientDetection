@@ -1,5 +1,4 @@
 {
-<<<<<<< HEAD
   "name": "codingextra",
   "version": "1.0.0",
   "description": "This error means one of three things: 1. The backend is not running → **start it** (see below) 2. MongoDB is not running → **start it** (see below)   3. You opened `auth.html` directly as a file → **use http://localhost:5000/auth.html instead**",
@@ -30,22 +29,3 @@
     "multer": "^2.1.1"
   }
 }
-=======
-  "name": "cancer-patient-detection",
-  "version": "1.0.0",
-  "private": true,
-  "description": "OncoClear backend and static frontend",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  },
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.2",
-    "multer": "^1.4.5-lts.1"
-  }
-}
->>>>>>> 575d88153cf73822eecd80f25b2c07b2b4799a74
