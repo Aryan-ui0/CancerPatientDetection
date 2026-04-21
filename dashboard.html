@@ -247,9 +247,18 @@
       content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
       background: var(--card-accent,var(--accent));
     }
-    .cancer-card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,0.3); border-color: rgba(0,212,255,0.2); }
-    .card-icon { font-size: 1.8rem; margin-bottom: 12px; }
-    .card-name { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .cancer-card:hover {
+      transform: translateY(-6px) scale(1.02);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+      border-color: var(--card-accent,var(--accent));
+      background: rgba(0,212,255,0.02);
+    }
+    .cancer-card:hover .card-name {
+      color: var(--card-accent,var(--accent));
+      transition: color 0.3s ease;
+    }
+    .card-icon { font-size: 1.8rem; margin-bottom: 12px; transition: transform 0.3s ease; }
+    .card-name { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; margin-bottom: 6px; transition: color 0.3s ease; }
     .card-desc { font-size: 0.8rem; color: var(--muted); line-height: 1.6; margin-bottom: 14px; }
     .card-tag {
       display: inline-block; padding: 3px 10px; border-radius: 100px;
@@ -673,6 +682,7 @@
   cancers.forEach((c, i) => {
     const el = document.createElement('div');
     el.className = 'cancer-card';
+    el.setAttribute('data-cancer', c.name);
     el.style.setProperty('--card-accent', c.color);
     el.style.animationDelay = `${i * 0.07}s`;
     el.innerHTML = `<div class="card-icon">${c.icon}</div><div class="card-name">${c.name}</div><div class="card-desc">${c.desc}</div><span class="card-tag" style="background:${c.tagBg};color:${c.tagColor}">${c.tag}</span>`;
